@@ -1,8 +1,9 @@
 mod filesystem;
+mod render;
 
 use std::{time::Duration, path::Path};
 
-use sdl2::{event::Event, keyboard::Keycode, pixels::Color, rect::Rect, render::TextureQuery};
+use sdl2::{event::Event, keyboard::Keycode, pixels::Color};
 
 fn main() {
     let window_width = 1600;
@@ -29,8 +30,6 @@ fn main() {
     let mut event_pump = sdl2_context.event_pump().unwrap();
 
     'running: loop {
-        let texture_creator = canvas.texture_creator();
-
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. } |
@@ -44,17 +43,7 @@ fn main() {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
 
-        let surface = font
-                .render("Reset game")
-                .blended(Color::RGB(30, 30, 30))
-                .unwrap();
-
-        let texture = texture_creator
-            .create_texture_from_surface(&surface)
-            .unwrap();
-
-        let TextureQuery { width, height, .. } = texture.query();
-        canvas.copy(&texture, None, Some(Rect::new(0, 0, width, height))).unwrap();  
+        render::render_text(&mut canvas, &font, "Reset game", Color::RGB(30, 30, 30), 0, 0); 
 
         canvas.present();
         std::thread::sleep(Duration::new(0, 1_000_000_000 / 60));
