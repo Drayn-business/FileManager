@@ -10,7 +10,7 @@ fn main() {
     let window_height = 900;
     let font_path = "C:/Sources/FileManager/fonts/Roboto-Medium.ttf";
 
-    filesystem::get("./");
+    let mut current_filenames: Vec<String> = vec![];
 
     let sdl2_context = sdl2::init().unwrap();
     let ttf_context = sdl2::ttf::init().unwrap();
@@ -18,7 +18,7 @@ fn main() {
     let video_subsystem = sdl2_context.video().unwrap();
 
     let font = ttf_context
-        .load_font(Path::new(font_path), 30)
+        .load_font(Path::new(font_path), 20)
         .unwrap();
 
     let window = video_subsystem.window("File Manager", window_width, window_height)
@@ -36,14 +36,26 @@ fn main() {
                 Event::KeyDown { keycode : Some(Keycode::Escape), .. } => {
                     break 'running;
                 },
+                Event::KeyDown { keycode: Some(Keycode::R), .. } => {
+                    current_filenames = vec![];
+                }
                 _ => {}
             }
+        }
+
+        if current_filenames.is_empty() {
+            current_filenames = filesystem::get("./");
         }
 
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
 
-        render::render_text(&mut canvas, &font, "Reset game", Color::RGB(30, 30, 30), 0, 0); 
+        let mut text_y = 0;
+        for path in current_filenames.clone() {
+            let (_, height) = render::render_text(&mut canvas, &font, path.as_str(), Color::RGB(200, 200, 200), 0, text_y); 
+
+            text_y += height as i32 + 5;
+        }
 
         canvas.present();
         std::thread::sleep(Duration::new(0, 1_000_000_000 / 60));
