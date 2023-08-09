@@ -34,7 +34,7 @@ fn main() {
 
     let video_subsystem = sdl2_context.video().unwrap();
 
-    let font = ttf_context
+    let mut font = ttf_context
         .load_font(Path::new(font_path), 20)
         .unwrap();
 
@@ -47,6 +47,29 @@ fn main() {
     let mut event_pump = sdl2_context.event_pump().unwrap();
 
     'running: loop {
+        if current_filenames.is_empty() {
+            let files_result = filesystem::get(current_path.clone());
+            
+            if files_result.is_none() {
+                current_path = current_path.parent().unwrap().to_path_buf();
+                current_filenames = filesystem::get(current_path.clone()).unwrap();
+            }
+            else {
+                current_filenames = files_result.unwrap();
+            }
+        }
+        
+        let mut text_y = 0;
+        for filename in current_filenames.clone() {
+            let text_x = 0;
+            let (width, height) = render::get_text_dimensions(&mut canvas, &font, filename.as_str(), Color::RGB(200, 200, 200)); 
+
+            let textfield = Textfield::new(filename, text_x, text_y, width, height);
+            current_textfields.push(textfield);
+
+            text_y += height as i32 + 5;
+        }
+        
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. } |
@@ -65,7 +88,6 @@ fn main() {
                             }
 
                             current_filenames = vec![];
-                            current_textfields = vec![];
                         }
                     }
                 }
@@ -73,32 +95,19 @@ fn main() {
             }
         }
 
-        if current_filenames.is_empty() {
-            let files_result = filesystem::get(current_path.clone());
-            
-            if files_result.is_none() {
-                current_path = current_path.parent().unwrap().to_path_buf();
-                current_filenames = filesystem::get(current_path.clone()).unwrap();
-            }
-            else {
-                current_filenames = files_result.unwrap();
-            }
-        }
-
         canvas.set_draw_color(Color::RGB(30, 30, 30));
         canvas.clear();
 
-        current_textfields = vec![];
-        let mut text_y = 0;
-        for filename in current_filenames.clone() {
-            let text_x = 0;
-            let (width, height) = render::render_text(&mut canvas, &font, filename.as_str(), Color::RGB(200, 200, 200), text_x, text_y); 
+        for textfield in current_textfields {
+            let x = event_pump.mouse_state().x();
+            let y = event_pump.mouse_state().y();
 
-            let textfield = Textfield::new(filename, text_x, text_y, width, height);
-            current_textfields.push(textfield);
+            let underlined: bool = (textfield.x..=(textfield.x + textfield.width as i32)).contains(&x) && (textfield.y..=(textfield.y + textfield.height as i32)).contains(&y);
 
-            text_y += height as i32 + 5;
+            render::render_text(&mut canvas, &mut font, textfield.text.as_str(), Color::RGB(200, 200, 200), textfield.x, textfield.y, underlined); 
         }
+
+        current_textfields = vec![];
 
         canvas.present();
         std::thread::sleep(Duration::new(0, 1_000_000_000 / 60));
