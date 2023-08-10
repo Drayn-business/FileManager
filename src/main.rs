@@ -24,6 +24,8 @@ fn main() {
     let window_width = 1600;
     let window_height = 900;
     let font_path = "C:/Sources/FileManager/fonts/Roboto-Medium.ttf";
+    let background_color = Color::RGB(30, 30, 30);
+    let text_color = Color::RGB(200, 200, 200);
 
     let mut current_path: PathBuf = PathBuf::new().join("C:/");
     let mut filenames: Vec<String> = vec![];
@@ -75,6 +77,7 @@ fn main() {
         let mut text_y = 0;
         for i in display_range.clone() {
             let filename = &filenames[i as usize];
+            
             let text_x = 0;
             let (width, height) = font.size_of(filename).unwrap();
             
@@ -92,8 +95,10 @@ fn main() {
                 },
                 Event::MouseButtonDown { mouse_btn: MouseButton::Left, x, y, .. } => {
                     for textfield in textfields.clone() {
-                        if (textfield.x..=(textfield.x + textfield.width as i32)).contains(&x) && 
-                           (textfield.y..=(textfield.y + textfield.height as i32)).contains(&y) {
+                        let textfield_vertical_range = textfield.x..=(textfield.x + textfield.width as i32);
+                        let textfield_horizontal_range = textfield.y..=(textfield.y + textfield.height as i32);
+
+                        if textfield_vertical_range.contains(&x) && textfield_horizontal_range.contains(&y) {
                             filenames = vec![];
                             display_offset = 0;
 
@@ -118,16 +123,19 @@ fn main() {
             }
         }
 
-        canvas.set_draw_color(Color::RGB(30, 30, 30));
+        canvas.set_draw_color(background_color);
         canvas.clear();
 
         for textfield in textfields {
             let x = event_pump.mouse_state().x();
             let y = event_pump.mouse_state().y();
 
-            let underlined: bool = (textfield.x..=(textfield.x + textfield.width as i32)).contains(&x) && (textfield.y..=(textfield.y + textfield.height as i32)).contains(&y);
+            let textfield_vertical_range = textfield.x..=(textfield.x + textfield.width as i32);
+            let textfield_horizontal_range = textfield.y..=(textfield.y + textfield.height as i32);
 
-            render::render_text(&mut canvas, &mut font, textfield.text.as_str(), Color::RGB(200, 200, 200), textfield.x, textfield.y, underlined); 
+            let underlined: bool = textfield_vertical_range.contains(&x) && textfield_horizontal_range.contains(&y);
+
+            render::render_text(&mut canvas, &mut font, textfield.text.as_str(), text_color, textfield.x, textfield.y, underlined); 
         }
 
         textfields = vec![];
