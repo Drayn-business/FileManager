@@ -1,9 +1,9 @@
 mod filesystem;
 mod render;
 
-use std::{time::Duration, path::{Path, PathBuf}, env};
+use std::{time::Duration, path::{Path, PathBuf}};
 
-use sdl2::{event::Event, keyboard::Keycode, pixels::Color, mouse::MouseButton};
+use sdl2::{event::Event, keyboard::Keycode, pixels::Color, mouse::{MouseButton, MouseWheelDirection}};
 
 #[derive(Clone)]
 struct Textfield {
@@ -25,9 +25,12 @@ fn main() {
     let window_height = 900;
     let font_path = "C:/Sources/FileManager/fonts/Roboto-Medium.ttf";
 
-    let mut current_path: PathBuf = env::current_dir().unwrap();
-    let mut current_filenames: Vec<String> = vec![];
+    let mut current_path: PathBuf = PathBuf::new().join("C:/");
+    let mut current_filenames: Vec<String>;
     let mut current_textfields: Vec<Textfield> = vec![];
+    let mut display_range: std::ops::Range<u32>;
+    let mut display_offset = 0;
+    let mut current_filenames_length: u32;
 
     let sdl2_context = sdl2::init().unwrap();
     let ttf_context = sdl2::ttf::init().unwrap();
@@ -47,23 +50,37 @@ fn main() {
     let mut event_pump = sdl2_context.event_pump().unwrap();
 
     'running: loop {
-        if current_filenames.is_empty() {
-            let files_result = filesystem::get(current_path.clone());
-            
-            if files_result.is_none() {
-                current_path = current_path.parent().unwrap().to_path_buf();
-                current_filenames = filesystem::get(current_path.clone()).unwrap();
-            }
-            else {
-                current_filenames = files_result.unwrap();
-            }
+        let files_result = filesystem::get(current_path.clone());
+        
+        if files_result.is_none() {
+            current_path = current_path.parent().unwrap().to_path_buf();
+            current_filenames = filesystem::get(current_path.clone()).unwrap();
         }
+        else {
+            current_filenames = files_result.unwrap();
+        }
+
+        current_filenames_length = current_filenames.len() as u32;
+
+        let (_, text_height) = font.size_of(current_filenames.first().unwrap().as_str()).unwrap();
+        let display_range_end: u32;
+
+        if current_filenames.len() <= (window_height / text_height) as usize {
+            display_range_end = current_filenames.len() as u32;
+        } else {
+            display_range_end = (window_height / text_height) + display_offset;
+        };
+
+        display_range = (0 + display_offset)..display_range_end;
+        
+        current_filenames = current_filenames.split_at(display_range.start as usize).1.to_vec();
+        current_filenames = current_filenames.split_at((display_range.end - display_range.start) as usize).0.to_vec();
         
         let mut text_y = 0;
         for filename in current_filenames.clone() {
             let text_x = 0;
-            let (width, height) = render::get_text_dimensions(&mut canvas, &font, filename.as_str(), Color::RGB(200, 200, 200)); 
-
+            let (width, height) = font.size_of(filename.as_str()).unwrap();
+            
             let textfield = Textfield::new(filename, text_x, text_y, width, height);
             current_textfields.push(textfield);
 
@@ -80,15 +97,23 @@ fn main() {
                     for textfield in current_textfields.clone() {
                         if (textfield.x..=(textfield.x + textfield.width as i32)).contains(&x) && 
                            (textfield.y..=(textfield.y + textfield.height as i32)).contains(&y) {
+                            display_offset = 0;
+
                             if textfield.text == ".."{
                                 current_path = current_path.parent().unwrap_or(&current_path).to_path_buf();
                             }
                             else {
                                 current_path = current_path.join(textfield.text);
                             }
-
-                            current_filenames = vec![];
                         }
+                    }
+                },
+                Event::MouseWheel { direction: MouseWheelDirection::Normal , y, ..} => {
+                    if y == 1 && display_range.start > 0{
+                        display_offset -= 1;
+                    }
+                    else if y == -1 && display_range.end < current_filenames_length as u32{
+                        display_offset += 1;
                     }
                 }
                 _ => {}
