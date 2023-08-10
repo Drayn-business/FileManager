@@ -26,11 +26,10 @@ fn main() {
     let font_path = "C:/Sources/FileManager/fonts/Roboto-Medium.ttf";
 
     let mut current_path: PathBuf = PathBuf::new().join("C:/");
-    let mut current_filenames: Vec<String>;
-    let mut current_textfields: Vec<Textfield> = vec![];
+    let mut filenames: Vec<String> = vec![];
+    let mut textfields: Vec<Textfield> = vec![];
     let mut display_range: std::ops::Range<u32>;
     let mut display_offset = 0;
-    let mut current_filenames_length: u32;
 
     let sdl2_context = sdl2::init().unwrap();
     let ttf_context = sdl2::ttf::init().unwrap();
@@ -50,39 +49,37 @@ fn main() {
     let mut event_pump = sdl2_context.event_pump().unwrap();
 
     'running: loop {
-        let files_result = filesystem::get(current_path.clone());
-        
-        if files_result.is_none() {
-            current_path = current_path.parent().unwrap().to_path_buf();
-            current_filenames = filesystem::get(current_path.clone()).unwrap();
-        }
-        else {
-            current_filenames = files_result.unwrap();
+        if filenames.is_empty(){
+            let files_result = filesystem::get(current_path.clone());
+            
+            if files_result.is_none() {
+                current_path = current_path.parent().unwrap().to_path_buf();
+                filenames = filesystem::get(current_path.clone()).unwrap();
+            }
+            else {
+                filenames = files_result.unwrap();
+            }
         }
 
-        current_filenames_length = current_filenames.len() as u32;
-
-        let (_, text_height) = font.size_of(current_filenames.first().unwrap().as_str()).unwrap();
+        let (_, text_height) = font.size_of(filenames.first().unwrap().as_str()).unwrap();
         let display_range_end: u32;
 
-        if current_filenames.len() <= (window_height / text_height) as usize {
-            display_range_end = current_filenames.len() as u32;
+        if filenames.len() <= (window_height / text_height) as usize {
+            display_range_end = filenames.len() as u32;
         } else {
             display_range_end = (window_height / text_height) + display_offset;
         };
 
         display_range = (0 + display_offset)..display_range_end;
         
-        current_filenames = current_filenames.split_at(display_range.start as usize).1.to_vec();
-        current_filenames = current_filenames.split_at((display_range.end - display_range.start) as usize).0.to_vec();
-        
         let mut text_y = 0;
-        for filename in current_filenames.clone() {
+        for i in display_range.clone() {
+            let filename = &filenames[i as usize];
             let text_x = 0;
-            let (width, height) = font.size_of(filename.as_str()).unwrap();
+            let (width, height) = font.size_of(filename).unwrap();
             
-            let textfield = Textfield::new(filename, text_x, text_y, width, height);
-            current_textfields.push(textfield);
+            let textfield = Textfield::new(filename.to_string(), text_x, text_y, width, height);
+            textfields.push(textfield);
 
             text_y += height as i32 + 5;
         }
@@ -94,9 +91,10 @@ fn main() {
                     break 'running;
                 },
                 Event::MouseButtonDown { mouse_btn: MouseButton::Left, x, y, .. } => {
-                    for textfield in current_textfields.clone() {
+                    for textfield in textfields.clone() {
                         if (textfield.x..=(textfield.x + textfield.width as i32)).contains(&x) && 
                            (textfield.y..=(textfield.y + textfield.height as i32)).contains(&y) {
+                            filenames = vec![];
                             display_offset = 0;
 
                             if textfield.text == ".."{
@@ -112,7 +110,7 @@ fn main() {
                     if y == 1 && display_range.start > 0{
                         display_offset -= 1;
                     }
-                    else if y == -1 && display_range.end < current_filenames_length as u32{
+                    else if y == -1 && display_range.end < filenames.len() as u32{
                         display_offset += 1;
                     }
                 }
@@ -123,7 +121,7 @@ fn main() {
         canvas.set_draw_color(Color::RGB(30, 30, 30));
         canvas.clear();
 
-        for textfield in current_textfields {
+        for textfield in textfields {
             let x = event_pump.mouse_state().x();
             let y = event_pump.mouse_state().y();
 
@@ -132,7 +130,7 @@ fn main() {
             render::render_text(&mut canvas, &mut font, textfield.text.as_str(), Color::RGB(200, 200, 200), textfield.x, textfield.y, underlined); 
         }
 
-        current_textfields = vec![];
+        textfields = vec![];
 
         canvas.present();
         std::thread::sleep(Duration::new(0, 1_000_000_000 / 60));
