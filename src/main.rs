@@ -21,16 +21,14 @@ impl Textfield {
 }
 
 fn main() {
-    let window_width = 1600;
-    let window_height = 900;
-    let font_path = "C:/Sources/FileManager/fonts/Roboto-Medium.ttf";
-    let background_color = Color::RGB(30, 30, 30);
-    let text_color = Color::RGB(200, 200, 200);
+    const WINDOW_WIDTH: u32 = 1600;
+    const WINDOW_HEIGHT: u32 = 900;
+    const FONT_PATH: &str = "C:/Sources/FileManager/fonts/Roboto-Medium.ttf";
+    const BACKGROUND_COLOR: Color = Color::RGB(30, 30, 30);
+    const TEXT_COLOR: Color = Color::RGB(200, 200, 200);
 
     let mut current_path: PathBuf = PathBuf::new().join("C:/");
     let mut filenames: Vec<String> = vec![];
-    let mut textfields: Vec<Textfield> = vec![];
-    let mut display_range: std::ops::Range<u32>;
     let mut display_offset = 0;
 
     let sdl2_context = sdl2::init().unwrap();
@@ -39,10 +37,10 @@ fn main() {
     let video_subsystem = sdl2_context.video().unwrap();
 
     let mut font = ttf_context
-        .load_font(Path::new(font_path), 20)
+        .load_font(Path::new(FONT_PATH), 20)
         .unwrap();
 
-    let window = video_subsystem.window("File Manager", window_width, window_height)
+    let window = video_subsystem.window("File Manager", WINDOW_WIDTH, WINDOW_HEIGHT)
         .build()
         .unwrap();
 
@@ -51,28 +49,31 @@ fn main() {
     let mut event_pump = sdl2_context.event_pump().unwrap();
 
     'running: loop {
+        let mut textfields: Vec<Textfield> = vec![];
+
         if filenames.is_empty(){
-            let files_result = filesystem::get(current_path.clone());
+            let mut files_result = filesystem::get(current_path.clone());
             
             if files_result.is_none() {
                 current_path = current_path.parent().unwrap().to_path_buf();
-                filenames = filesystem::get(current_path.clone()).unwrap();
+                files_result = filesystem::get(current_path.clone());
             }
-            else {
-                filenames = files_result.unwrap();
-            }
+
+            filenames = files_result.unwrap();
         }
 
         let (_, text_height) = font.size_of(filenames.first().unwrap().as_str()).unwrap();
+        let row_amount = WINDOW_HEIGHT / text_height;
+        
         let display_range_end: u32;
 
-        if filenames.len() <= (window_height / text_height) as usize {
+        if filenames.len() <= row_amount as usize {
             display_range_end = filenames.len() as u32;
         } else {
-            display_range_end = (window_height / text_height) + display_offset;
+            display_range_end = row_amount + display_offset;
         };
 
-        display_range = (0 + display_offset)..display_range_end;
+        let display_range = (0 + display_offset)..display_range_end;
         
         let mut text_y = 0;
         for i in display_range.clone() {
@@ -123,7 +124,7 @@ fn main() {
             }
         }
 
-        canvas.set_draw_color(background_color);
+        canvas.set_draw_color(BACKGROUND_COLOR);
         canvas.clear();
 
         for textfield in textfields {
@@ -135,10 +136,8 @@ fn main() {
 
             let underlined: bool = textfield_vertical_range.contains(&x) && textfield_horizontal_range.contains(&y);
 
-            render::render_text(&mut canvas, &mut font, textfield.text.as_str(), text_color, textfield.x, textfield.y, underlined); 
+            render::render_text(&mut canvas, &mut font, textfield.text.as_str(), TEXT_COLOR, textfield.x, textfield.y, underlined); 
         }
-
-        textfields = vec![];
 
         canvas.present();
         std::thread::sleep(Duration::new(0, 1_000_000_000 / 60));
