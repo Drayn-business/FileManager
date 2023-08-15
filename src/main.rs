@@ -119,20 +119,22 @@ fn main() {
                         let textfield_horizontal_range =
                             textfield.y..=(textfield.y + textfield.height as i32);
 
-                        if textfield_vertical_range.contains(&x)
-                            && textfield_horizontal_range.contains(&y)
+                        if !textfield_vertical_range.contains(&x)
+                            || !textfield_horizontal_range.contains(&y)
                         {
-                            filenames = vec![];
-                            display_offset = 0;
+                            continue;
+                        }
 
-                            if textfield.text == ".." {
-                                current_path =
-                                    current_path.parent().unwrap_or(&current_path).to_path_buf();
-                            } else {
-                                current_path = current_path.join(textfield.text);
-                                if current_path.is_file() {
-                                    current_path = current_path.parent().unwrap().to_path_buf();
-                                }
+                        filenames = vec![];
+                        display_offset = 0;
+
+                        if textfield.text == ".." {
+                            current_path =
+                                current_path.parent().unwrap_or(&current_path).to_path_buf();
+                        } else {
+                            current_path = current_path.join(textfield.text);
+                            if current_path.is_file() {
+                                current_path = current_path.parent().unwrap().to_path_buf();
                             }
                         }
                     }

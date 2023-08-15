@@ -1,4 +1,7 @@
-use std::{fs::{self}, path::PathBuf};
+use std::{
+    fs::{self},
+    path::PathBuf,
+};
 
 pub fn get(path: PathBuf) -> Option<Vec<String>> {
     if path.is_file() {
