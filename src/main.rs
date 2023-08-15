@@ -1,9 +1,17 @@
 mod filesystem;
 mod render;
 
-use std::{time::Duration, path::{Path, PathBuf}};
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
-use sdl2::{event::Event, keyboard::Keycode, pixels::Color, mouse::{MouseButton, MouseWheelDirection}};
+use sdl2::{
+    event::Event,
+    keyboard::Keycode,
+    mouse::{MouseButton, MouseWheelDirection},
+    pixels::Color,
+};
 
 #[derive(Clone)]
 struct Textfield {
@@ -11,12 +19,18 @@ struct Textfield {
     x: i32,
     y: i32,
     width: u32,
-    height: u32
+    height: u32,
 }
 
 impl Textfield {
     fn new(text: String, x: i32, y: i32, width: u32, height: u32) -> Self {
-        return Textfield { text, x, y, width, height };
+        return Textfield {
+            text,
+            x,
+            y,
+            width,
+            height,
+        };
     }
 }
 
@@ -24,6 +38,7 @@ fn main() {
     const WINDOW_WIDTH: u32 = 1600;
     const WINDOW_HEIGHT: u32 = 900;
     const FONT_PATH: &str = "C:/Sources/FileManager/fonts/Roboto-Medium.ttf";
+    const EXAMPLE_TEXT: &str = "Foo";
     const BACKGROUND_COLOR: Color = Color::RGB(30, 30, 30);
     const TEXT_COLOR: Color = Color::RGB(200, 200, 200);
 
@@ -36,11 +51,10 @@ fn main() {
 
     let video_subsystem = sdl2_context.video().unwrap();
 
-    let mut font = ttf_context
-        .load_font(Path::new(FONT_PATH), 20)
-        .unwrap();
+    let mut font = ttf_context.load_font(Path::new(FONT_PATH), 20).unwrap();
 
-    let window = video_subsystem.window("File Manager", WINDOW_WIDTH, WINDOW_HEIGHT)
+    let window = video_subsystem
+        .window("File Manager", WINDOW_WIDTH, WINDOW_HEIGHT)
         .build()
         .unwrap();
 
@@ -51,72 +65,86 @@ fn main() {
     'running: loop {
         let mut textfields: Vec<Textfield> = vec![];
 
-        if filenames.is_empty(){
-            let mut files_result = filesystem::get(current_path.clone());
-            
-            if files_result.is_none() {
-                current_path = current_path.parent().unwrap().to_path_buf();
-                files_result = filesystem::get(current_path.clone());
-            }
+        if filenames.is_empty() {
+            //TODO: add none handling (e.g. access is denied)
+            let files_result = filesystem::get(current_path.clone());
 
-            filenames = files_result.unwrap();
+            if files_result.is_some() {
+                filenames = files_result.unwrap();
+            }
         }
 
-        let (_, text_height) = font.size_of(filenames.first().unwrap().as_str()).unwrap();
-        let row_amount = WINDOW_HEIGHT / text_height;
-        
-        let display_range_end: u32;
+        let font_height = font.size_of(EXAMPLE_TEXT).unwrap().1;
+        let visible_rows = WINDOW_HEIGHT / font_height;
 
-        if filenames.len() <= row_amount as usize {
+        let mut display_range_end: u32 = visible_rows + display_offset;
+
+        if filenames.len() <= visible_rows as usize {
             display_range_end = filenames.len() as u32;
-        } else {
-            display_range_end = row_amount + display_offset;
         };
 
         let display_range = (0 + display_offset)..display_range_end;
-        
+
         let mut text_y = 0;
         for i in display_range.clone() {
             let filename = &filenames[i as usize];
-            
+
             let text_x = 0;
             let (width, height) = font.size_of(filename).unwrap();
-            
+
             let textfield = Textfield::new(filename.to_string(), text_x, text_y, width, height);
             textfields.push(textfield);
 
             text_y += height as i32 + 5;
         }
-        
+
         for event in event_pump.poll_iter() {
             match event {
-                Event::Quit { .. } |
-                Event::KeyDown { keycode : Some(Keycode::Escape), .. } => {
+                Event::Quit { .. }
+                | Event::KeyDown {
+                    keycode: Some(Keycode::Escape),
+                    ..
+                } => {
                     break 'running;
-                },
-                Event::MouseButtonDown { mouse_btn: MouseButton::Left, x, y, .. } => {
+                }
+                Event::MouseButtonDown {
+                    mouse_btn: MouseButton::Left,
+                    x,
+                    y,
+                    ..
+                } => {
                     for textfield in textfields.clone() {
-                        let textfield_vertical_range = textfield.x..=(textfield.x + textfield.width as i32);
-                        let textfield_horizontal_range = textfield.y..=(textfield.y + textfield.height as i32);
+                        let textfield_vertical_range =
+                            textfield.x..=(textfield.x + textfield.width as i32);
+                        let textfield_horizontal_range =
+                            textfield.y..=(textfield.y + textfield.height as i32);
 
-                        if textfield_vertical_range.contains(&x) && textfield_horizontal_range.contains(&y) {
+                        if textfield_vertical_range.contains(&x)
+                            && textfield_horizontal_range.contains(&y)
+                        {
                             filenames = vec![];
                             display_offset = 0;
 
-                            if textfield.text == ".."{
-                                current_path = current_path.parent().unwrap_or(&current_path).to_path_buf();
-                            }
-                            else {
+                            if textfield.text == ".." {
+                                current_path =
+                                    current_path.parent().unwrap_or(&current_path).to_path_buf();
+                            } else {
                                 current_path = current_path.join(textfield.text);
+                                if current_path.is_file() {
+                                    current_path = current_path.parent().unwrap().to_path_buf();
+                                }
                             }
                         }
                     }
-                },
-                Event::MouseWheel { direction: MouseWheelDirection::Normal , y, ..} => {
-                    if y == 1 && display_range.start > 0{
+                }
+                Event::MouseWheel {
+                    direction: MouseWheelDirection::Normal,
+                    y,
+                    ..
+                } => {
+                    if y == 1 && display_range.start > 0 {
                         display_offset -= 1;
-                    }
-                    else if y == -1 && display_range.end < filenames.len() as u32{
+                    } else if y == -1 && display_range.end < filenames.len() as u32 {
                         display_offset += 1;
                     }
                 }
@@ -134,9 +162,18 @@ fn main() {
             let textfield_vertical_range = textfield.x..=(textfield.x + textfield.width as i32);
             let textfield_horizontal_range = textfield.y..=(textfield.y + textfield.height as i32);
 
-            let underlined: bool = textfield_vertical_range.contains(&x) && textfield_horizontal_range.contains(&y);
+            let underlined: bool =
+                textfield_vertical_range.contains(&x) && textfield_horizontal_range.contains(&y);
 
-            render::render_text(&mut canvas, &mut font, textfield.text.as_str(), TEXT_COLOR, textfield.x, textfield.y, underlined); 
+            render::render_text(
+                &mut canvas,
+                &mut font,
+                textfield.text.as_str(),
+                TEXT_COLOR,
+                textfield.x,
+                textfield.y,
+                underlined,
+            );
         }
 
         canvas.present();
