@@ -42,7 +42,7 @@ fn main() {
     const BACKGROUND_COLOR: Color = Color::RGB(30, 30, 30);
     const TEXT_COLOR: Color = Color::RGB(200, 200, 200);
 
-    let mut current_path: PathBuf = PathBuf::new().join("C:/");
+    let mut path_buf: PathBuf = PathBuf::new().join("C:/");
     let mut filenames: Vec<String> = vec![];
     let mut display_offset = 0;
 
@@ -67,7 +67,7 @@ fn main() {
 
         if filenames.is_empty() {
             //TODO: add none handling (e.g. access is denied)
-            let files_result = filesystem::get(current_path.clone());
+            let files_result = filesystem::get(path_buf.clone());
 
             if files_result.is_some() {
                 filenames = files_result.unwrap();
@@ -113,31 +113,10 @@ fn main() {
                     y,
                     ..
                 } => {
-                    for textfield in textfields.clone() {
-                        let textfield_vertical_range =
-                            textfield.x..=(textfield.x + textfield.width as i32);
-                        let textfield_horizontal_range =
-                            textfield.y..=(textfield.y + textfield.height as i32);
+                    path_buf = on_click_switch_directories(textfields.clone(), path_buf, x, y);
 
-                        if !textfield_vertical_range.contains(&x)
-                            || !textfield_horizontal_range.contains(&y)
-                        {
-                            continue;
-                        }
-
-                        filenames = vec![];
-                        display_offset = 0;
-
-                        if textfield.text == ".." {
-                            current_path =
-                                current_path.parent().unwrap_or(&current_path).to_path_buf();
-                        } else {
-                            current_path = current_path.join(textfield.text);
-                            if current_path.is_file() {
-                                current_path = current_path.parent().unwrap().to_path_buf();
-                            }
-                        }
-                    }
+                    filenames = vec![];
+                    display_offset = 0;
                 }
                 Event::MouseWheel {
                     direction: MouseWheelDirection::Normal,
@@ -181,4 +160,37 @@ fn main() {
         canvas.present();
         std::thread::sleep(Duration::new(0, 1_000_000_000 / 60));
     }
+}
+
+fn on_click_switch_directories(
+    textfields: Vec<Textfield>,
+    path_buf: PathBuf,
+    x: i32,
+    y: i32,
+) -> PathBuf {
+    let mut new_path: PathBuf = path_buf.clone();
+    for textfield in textfields {
+        let textfield_vertical_range = textfield.x..=(textfield.x + textfield.width as i32);
+        let textfield_horizontal_range = textfield.y..=(textfield.y + textfield.height as i32);
+
+        if !textfield_vertical_range.contains(&x) || !textfield_horizontal_range.contains(&y) {
+            continue;
+        }
+
+        new_path = switch_directories(path_buf.clone(), &textfield.text);
+    }
+
+    return new_path;
+}
+
+fn switch_directories(path_buf: PathBuf, text: &str) -> PathBuf {
+    if text != ".." {
+        let new_path = path_buf.join(text);
+        if new_path.is_file() {
+            return path_buf;
+        }
+        return new_path;
+    }
+
+    return path_buf.parent().unwrap_or(&path_buf).to_path_buf();
 }
