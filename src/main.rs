@@ -2,6 +2,7 @@ mod filesystem;
 mod render;
 
 use std::{
+    ops::Range,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -11,7 +12,17 @@ use sdl2::{
     keyboard::Keycode,
     mouse::{MouseButton, MouseWheelDirection},
     pixels::Color,
+    render::Canvas,
+    video::Window,
+    EventPump,
 };
+
+const WINDOW_WIDTH: u32 = 1600;
+const WINDOW_HEIGHT: u32 = 900;
+const FONT_PATH: &str = "C:/Sources/FileManager/fonts/Roboto-Medium.ttf";
+const EXAMPLE_TEXT: &str = "Foo";
+const BACKGROUND_COLOR: Color = Color::RGB(30, 30, 30);
+const TEXT_COLOR: Color = Color::RGB(200, 200, 200);
 
 #[derive(Clone)]
 struct Textfield {
@@ -35,13 +46,6 @@ impl Textfield {
 }
 
 fn main() {
-    const WINDOW_WIDTH: u32 = 1600;
-    const WINDOW_HEIGHT: u32 = 900;
-    const FONT_PATH: &str = "C:/Sources/FileManager/fonts/Roboto-Medium.ttf";
-    const EXAMPLE_TEXT: &str = "Foo";
-    const BACKGROUND_COLOR: Color = Color::RGB(30, 30, 30);
-    const TEXT_COLOR: Color = Color::RGB(200, 200, 200);
-
     let mut path_buf: PathBuf = PathBuf::new().join("C:/");
     let mut filenames: Vec<String> = vec![];
     let mut display_offset = 0;
@@ -63,40 +67,18 @@ fn main() {
     let mut event_pump = sdl2_context.event_pump().unwrap();
 
     'running: loop {
-        let mut textfields: Vec<Textfield> = vec![];
-
         if filenames.is_empty() {
             //TODO: add none handling (e.g. access is denied)
-            let files_result = filesystem::get(path_buf.clone());
+            let files_result = filesystem::get(&path_buf);
 
             if files_result.is_some() {
                 filenames = files_result.unwrap();
             }
         }
 
-        let font_height = font.size_of(EXAMPLE_TEXT).unwrap().1;
-        let visible_rows = WINDOW_HEIGHT / font_height;
+        let display_range = calculate_display_range(&font, &filenames, display_offset);
 
-        let mut display_range_end: u32 = visible_rows + display_offset;
-
-        if filenames.len() <= visible_rows as usize {
-            display_range_end = filenames.len() as u32;
-        };
-
-        let display_range = (0 + display_offset)..display_range_end;
-
-        let mut text_y = 0;
-        for i in display_range.clone() {
-            let filename = &filenames[i as usize];
-
-            let text_x = 0;
-            let (width, height) = font.size_of(filename).unwrap();
-
-            let textfield = Textfield::new(filename.to_string(), text_x, text_y, width, height);
-            textfields.push(textfield);
-
-            text_y += height as i32 + 5;
-        }
+        let textfields: Vec<Textfield> = create_textfields(&font, &filenames, &display_range);
 
         for event in event_pump.poll_iter() {
             match event {
@@ -113,7 +95,7 @@ fn main() {
                     y,
                     ..
                 } => {
-                    path_buf = on_click_switch_directories(textfields.clone(), path_buf, x, y);
+                    path_buf = on_click_switch_directories(&textfields, path_buf, x, y);
 
                     filenames = vec![];
                     display_offset = 0;
@@ -136,34 +118,83 @@ fn main() {
         canvas.set_draw_color(BACKGROUND_COLOR);
         canvas.clear();
 
-        for textfield in textfields {
-            let x = event_pump.mouse_state().x();
-            let y = event_pump.mouse_state().y();
-
-            let textfield_vertical_range = textfield.x..=(textfield.x + textfield.width as i32);
-            let textfield_horizontal_range = textfield.y..=(textfield.y + textfield.height as i32);
-
-            let underlined: bool =
-                textfield_vertical_range.contains(&x) && textfield_horizontal_range.contains(&y);
-
-            render::render_text(
-                &mut canvas,
-                &mut font,
-                textfield.text.as_str(),
-                TEXT_COLOR,
-                textfield.x,
-                textfield.y,
-                underlined,
-            );
-        }
+        render_textfields(&mut canvas, &mut font, &event_pump, textfields);
 
         canvas.present();
         std::thread::sleep(Duration::new(0, 1_000_000_000 / 60));
     }
 }
 
-fn on_click_switch_directories(
+fn calculate_display_range(
+    font: &sdl2::ttf::Font<'_, '_>,
+    filenames: &Vec<String>,
+    display_offset: u32,
+) -> Range<u32> {
+    let font_height = font.size_of(EXAMPLE_TEXT).unwrap().1;
+    let visible_rows = WINDOW_HEIGHT / font_height;
+
+    let mut display_range_end: u32 = visible_rows + display_offset;
+
+    if filenames.len() <= visible_rows as usize {
+        display_range_end = filenames.len() as u32;
+    };
+
+    return (0 + display_offset)..display_range_end;
+}
+
+fn create_textfields(
+    font: &sdl2::ttf::Font<'_, '_>,
+    filenames: &Vec<String>,
+    display_range: &Range<u32>,
+) -> Vec<Textfield> {
+    let mut textfields: Vec<Textfield> = vec![];
+
+    let mut text_y = 0;
+    for i in display_range.clone() {
+        let filename = &filenames[i as usize];
+
+        let text_x = 0;
+        let (width, height) = font.size_of(filename).unwrap();
+
+        let textfield = Textfield::new(filename.to_string(), text_x, text_y, width, height);
+        textfields.push(textfield);
+
+        text_y += height as i32 + 5;
+    }
+
+    return textfields;
+}
+
+fn render_textfields(
+    canvas: &mut Canvas<Window>,
+    font: &mut sdl2::ttf::Font<'_, '_>,
+    event_pump: &EventPump,
     textfields: Vec<Textfield>,
+) {
+    for textfield in textfields {
+        let x = event_pump.mouse_state().x();
+        let y = event_pump.mouse_state().y();
+
+        let textfield_vertical_range = textfield.x..=(textfield.x + textfield.width as i32);
+        let textfield_horizontal_range = textfield.y..=(textfield.y + textfield.height as i32);
+
+        let underlined: bool =
+            textfield_vertical_range.contains(&x) && textfield_horizontal_range.contains(&y);
+
+        render::render_text(
+            canvas,
+            font,
+            textfield.text.as_str(),
+            TEXT_COLOR,
+            textfield.x,
+            textfield.y,
+            underlined,
+        );
+    }
+}
+
+fn on_click_switch_directories(
+    textfields: &Vec<Textfield>,
     path_buf: PathBuf,
     x: i32,
     y: i32,

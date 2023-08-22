@@ -3,7 +3,7 @@ use std::{
     path::PathBuf,
 };
 
-pub fn get(path: PathBuf) -> Option<Vec<String>> {
+pub fn get(path: &PathBuf) -> Option<Vec<String>> {
     if path.is_file() {
         return None;
     }
